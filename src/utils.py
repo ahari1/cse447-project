@@ -37,9 +37,11 @@ def next_char(model, tokenizer, token_vocab, input_text, lookback=4, device="cpu
     # potentially add in later
     # elif input_text.endswith( char for char in string.punctuation + " "):
    
-    tokens["input_ids"].to(device)
-    tokens["attention_mask"].to(device)
+    tokens["input_ids"] = tokens["input_ids"].to(device)
+    tokens["attention_mask"] = tokens["attention_mask"].to(device)
     # Evaluate model
+    print("model device", model.device)
+    print("token device", tokens["input_ids"].device, tokens["attention_mask"].device)
     with torch.no_grad():
         outputs = model(**tokens) # Changed from inputs to tokens
         logits = outputs.logits
