@@ -2,15 +2,16 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 import torch
 import torch.nn.functional as F
 from collections import defaultdict
-import sys
+import os
 
 def load_bloom(work_dir="../work", device="cpu"):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
-    model_path = sys.path.append(work_dir, "bloom-560m.q8_0.gguf")
+    filename = "bloom-560m.q8_0.gguf"
+    # model_path = os.path.join(work_dir, filename)
     model_id = "afrideva/bloom-560m-GGUF"
-    tokenizer = AutoTokenizer.from_pretrained(model_id, gguf_file=model_path)
-    model = AutoModelForCausalLM.from_pretrained(model_id, gguf_file=model_path)
+    tokenizer = AutoTokenizer.from_pretrained(work_dir, gguf_file=filename)
+    model = AutoModelForCausalLM.from_pretrained(work_dir, gguf_file=filename)
 
     token_vocab = tokenizer.batch_decode(torch.arange(tokenizer.vocab_size))
 
