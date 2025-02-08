@@ -3,12 +3,22 @@ import os
 import string
 import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
+from utils import load_bloom, next_char as nc
+import torch
 
 
 class MyModel:
     """
     This is a starter model to get you started. Feel free to modify this file.
     """
+
+    def __init__(self, model, tokenizer, token_vocab, device):
+        self.model = model
+        self.token_vocab = token_vocab
+        self.tokenizer = tokenizer
+        self.device = device
+        self.common_chars = [" ", "e", 'a', 'r', 'i', 'n', 's']
+        
 
     @classmethod
     def load_training_data(cls):
@@ -37,13 +47,22 @@ class MyModel:
         pass
 
     def run_pred(self, data):
-        # your code here
-        preds = []
-        all_chars = string.ascii_letters
-        for inp in data:
-            # this model just predicts a random character each time
-            top_guesses = [random.choice(all_chars) for _ in range(3)]
-            preds.append(''.join(top_guesses))
+        # parallelize this at some point
+        preds: list[str] = []
+        for test in data:
+            curr_preds = nc(self.model, self.tokenizer, self.token_vocab, test, device=self.device)
+            curr_preds = [p[0] for p in curr_preds]
+
+            if len(curr_preds) < 3:
+                for i in range(len(self.common_chars)):
+                    if self.common_chars[i] not in preds:
+                        curr_preds.append(self.common_chars[i])
+                    if len(curr_preds) >=3:
+                        break
+            else:
+                curr_preds = curr_preds[:3]
+
+            preds.append(''.join(curr_preds))
         return preds
 
     def save(self, work_dir):
@@ -56,9 +75,15 @@ class MyModel:
     def load(cls, work_dir):
         # your code here
         # this particular model has nothing to load, but for demonstration purposes we will load a blank file
-        with open(os.path.join(work_dir, 'model.checkpoint')) as f:
-            dummy_save = f.read()
-        return MyModel()
+        
+        device = "cuda" if torch.cuda.is_available() else "cpu"
+        model, tokenizer, token_vocab = load_bloom(work_dir, device)
+        instance = cls(model, tokenizer, token_vocab, device)
+        # instance.model = model
+        # instance.token_vocab = token_vocab
+        # with open(os.path.join(work_dir, 'model.checkpoint')) as f:
+        #     dummy_save = f.read()
+        return instance
 
 
 if __name__ == '__main__':
