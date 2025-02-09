@@ -1,104 +1,85 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
-import torch.nn.functional as F
+import llama_cpp
 from collections import defaultdict
+import numpy as np
 import os
 
-def load_bloom(work_dir="../work", device="cpu"):
+def load_bloom(work_dir="../work"):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
     filename = "bloom-560m.q8_0.gguf"
-    # model_path = os.path.join(work_dir, filename)
-    model_id = "afrideva/bloom-560m-GGUF"
-    tokenizer = AutoTokenizer.from_pretrained(work_dir, gguf_file=filename)
-    model = AutoModelForCausalLM.from_pretrained(work_dir, gguf_file=filename)
+    model = llama_cpp.Llama(model_path=os.path.join(work_dir, filename))
 
-    token_vocab = tokenizer.batch_decode(torch.arange(tokenizer.vocab_size))
+    # load token vocabulary
+    NUM_TOKENS = 250680
+    token_vocab = []
+    for token in range(NUM_TOKENS):
+        try:
+            decoded_token = model.detokenize([token]).decode("utf-8")
+        except UnicodeDecodeError:
+            # Handle the error, e.g., by replacing the invalid token with a placeholder
+            decoded_token = f"[INVALID TOKEN {token}]"
+        token_vocab.append(decoded_token)
+    return model, token_vocab
 
-    model.to(device)
-    return model, tokenizer, token_vocab
+def softmax(x, axis=None):
+    max_val = np.max(x, axis=axis, keepdims=True)
+    exp_x = np.exp(x - max_val)
+    sum_exp_x = np.sum(exp_x, axis=axis, keepdims=True)
+    return exp_x / sum_exp_x
 
-
-def next_char(model, tokenizer, token_vocab, input_text, lookback=4, device="cpu") -> list[tuple[str, float]]:
-    tokens = tokenizer(input_text, return_tensors="pt")
-    if tokens["input_ids"].shape[1] < 2:
-        # If input size is too small, just feed model with \n + tokens
-        tokens["input_ids"] = torch.cat([torch.tensor([[189]], dtype=int), tokens["input_ids"]], dim=1)
-        tokens["attention_mask"] = torch.cat([torch.tensor([[1]], dtype=int), tokens["attention_mask"]], dim=1)
-    
+def next_char(model, token_vocab, input_text, lookback=4):
+    tokens = model.tokenize(input_text.encode("utf-8"))
     if input_text.endswith(". "):
-        # If the text ends with ". ", tokenize as "." and " " instead of ". "
-        tokens["input_ids"] = torch.cat([tokens["input_ids"][:, :-1], torch.tensor([[17, 210]], dtype=int)], dim=1)
-        tokens["attention_mask"] = torch.cat([torch.tensor([[1]], dtype=int), tokens["attention_mask"]], dim=1)
+        # hacky because tokenizer is dumb as a rock
+        tokens = tokens[:-1] + [17, 210]
     elif input_text.endswith(", "):
-        tokens["input_ids"] = torch.cat([tokens["input_ids"][:, :-1], torch.tensor([[15, 210]], dtype=int)], dim=1)
-        tokens["attention_mask"] = torch.cat([torch.tensor([[1]], dtype=int), tokens["attention_mask"]], dim=1)
-
-    # potentially add in later
-    # elif input_text.endswith( char for char in string.punctuation + " "):
-   
-    tokens["input_ids"] = tokens["input_ids"].to(device)
-    tokens["attention_mask"] = tokens["attention_mask"].to(device)
+        tokens = tokens[:-1] + [15, 210]
     # Evaluate model
-    print("model device", model.device)
-    print("token device", tokens["input_ids"].device, tokens["attention_mask"].device)
-    with torch.no_grad():
-        outputs = model(**tokens) # Changed from inputs to tokens
-        logits = outputs.logits
-    # we want to return ALL logits. This allows us to try different positions
-    # I am an astronaut and 
-    # I am an astronaut P(anderson) / P(all tokens that even partially complete)
-    logits = logits[0, :, :].to("cpu")
+    model(tokens, max_tokens=1)
+    logits = model._scores
     results = defaultdict(float)
-    num_tokens = tokens["input_ids"].shape[1]
+    num_tokens = len(tokens)
     location_prob = 1
     for idx in range(max(0, num_tokens - lookback) + 1, num_tokens):
-        remaining_text = tokenizer.decode(tokens["input_ids"][0, idx+1:])
-        curr_logits = logits[idx].clone() # predict next token for input ending at token idx
+        remaining_text = model.detokenize(tokens[idx+1:]).decode("utf-8")
+        curr_logits = logits[idx]
         valid_tokens = [i for i, token in enumerate(token_vocab) if len(token) > len(remaining_text) and token.startswith(remaining_text)]
         valid_tokens2 = [i for i, token in enumerate(token_vocab) if len(token) <= len(remaining_text) and remaining_text.startswith(token)]
         if len(valid_tokens) <= 0:
-            # no new tokens to add to predcitions
-            mask = torch.zeros(curr_logits.shape, dtype=bool)
+            mask = np.zeros(curr_logits.shape, dtype=bool)
             mask[valid_tokens2] = True
             mask[valid_tokens] = True
-            processed_logits = torch.where(mask, curr_logits, -torch.inf)
-            curr_prob = F.softmax(processed_logits, dim=-1)
-            next_token_prob = max(curr_prob[tokens["input_ids"][0, idx]].item(), 1e-2) # try idx+1 here?
+            processed_logits = np.where(mask, curr_logits, -np.inf)
+            curr_prob = softmax(processed_logits, axis=-1)
+            next_token_prob = max(curr_prob[tokens[idx+1]].item(), 1e-2)
             location_prob *= next_token_prob
             continue
         else:
-            # we found candidates
-            mask = torch.zeros(curr_logits.shape, dtype=bool)
-            mask2 = torch.zeros(curr_logits.shape, dtype=bool)
+            mask = np.zeros(curr_logits.shape, dtype=bool)
+            mask2 = np.zeros(curr_logits.shape, dtype=bool)
             mask2[valid_tokens2] = True
             mask[valid_tokens] = True
-            processed_logits = torch.where(mask | mask2, curr_logits, -torch.inf)
+            processed_logits = np.where(mask | mask2, curr_logits, -np.inf)
             if idx < num_tokens - 1:
-                # not at the end
-                processed_logits[tokens["input_ids"][0, idx]] = curr_logits[tokens["input_ids"][0, idx]] # try +1???
-                curr_prob = F.softmax(processed_logits, dim=-1)
-                next_token_prob = max(curr_prob[tokens["input_ids"][0, idx]].item(), 1e-2)
+                processed_logits[tokens[idx]] = curr_logits[tokens[idx]]
+                curr_prob = softmax(processed_logits, axis=-1)
+                next_token_prob = max(curr_prob[tokens[idx+1]].item(), 1e-2)
             else:
-                # predicting starting from last token
-                curr_prob = F.softmax(processed_logits, dim=-1)
+                curr_prob = softmax(processed_logits, axis=-1)
                 next_token_prob = 1
-            top_probs, indices = torch.topk(curr_prob, 100)
-            token_vals = tokenizer.batch_decode(indices)
+            indices = np.argpartition(curr_prob, -100)[-100:]
+            top_probs = curr_prob[indices]
+            token_vals = [model.detokenize([i]) for i in indices]
             for prob, index, token_val in zip(top_probs, indices, token_vals):
                 if mask[index]:
-                    # completely completes remaining text
                     if prob < 1e-4:
                         continue
-                    token_char = token_val[len(remaining_text)]
-                    # I am an astronaut and
-                    # prob.item() = P(anderson | I am an astronaut )
-                    # location_prob = P(I am an astronaut)
-                    # location_prob = P(and | I am an astronaut ) ?
-                    # What we want: P(anderson | I am an astronaut and) * P(I am an astronaut and)
-
-                    
-                    results[token_char] += prob.item() * location_prob # /?
+                    try:
+                        token_char = token_val.decode("utf-8")[len(remaining_text)]
+                        # print(idx, prob.item(), f'"{token_val}"', f"'{token_char}'")
+                        results[token_char] += prob.item() * location_prob
+                    except:
+                        pass
 
             location_prob *= next_token_prob
 

@@ -13,11 +13,9 @@ class MyModel:
     This is a starter model to get you started. Feel free to modify this file.
     """
 
-    def __init__(self, model, tokenizer, token_vocab, device):
+    def __init__(self, model, token_vocab):
         self.model = model
         self.token_vocab = token_vocab
-        self.tokenizer = tokenizer
-        self.device = device
         self.common_chars = [" ", "e", 'a', 'r', 'i', 'n', 's']
         
 
@@ -56,8 +54,8 @@ class MyModel:
             if k > 0 and k % 50 == 0:
                 print(f"{k} in {time.time() - t}s (average {(time.time() - t) / k}s per prediction).")
             k += 1
-            curr_preds = nc(self.model, self.tokenizer, self.token_vocab, test, device=self.device)
-            curr_preds = [p[0] for p in curr_preds]
+            curr_preds = nc(self.model, self.token_vocab, test)
+            curr_preds = [p[0] for p in curr_preds if p[0] != "\n"]
 
             if len(curr_preds) < 3:
                 for i in range(len(self.common_chars)):
@@ -82,9 +80,8 @@ class MyModel:
         # your code here
         # this particular model has nothing to load, but for demonstration purposes we will load a blank file
         
-        device = "cuda" if torch.cuda.is_available() else "cpu"
-        model, tokenizer, token_vocab = load_bloom(work_dir, device)
-        instance = cls(model, tokenizer, token_vocab, device)
+        model, token_vocab = load_bloom(work_dir)
+        instance = cls(model, token_vocab)
         # instance.model = model
         # instance.token_vocab = token_vocab
         # with open(os.path.join(work_dir, 'model.checkpoint')) as f:
