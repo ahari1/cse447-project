@@ -5,6 +5,7 @@ import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from utils import load_bloom, next_char as nc
 import torch
+import time
 
 
 class MyModel:
@@ -49,7 +50,12 @@ class MyModel:
     def run_pred(self, data):
         # parallelize this at some point
         preds: list[str] = []
+        k = 0
+        t = time.time()
         for test in data:
+            if k > 0 and k % 50 == 0:
+                print(f"{k} in {time.time() - t}s (average {(time.time() - t) / k}s per prediction).")
+            k += 1
             curr_preds = nc(self.model, self.tokenizer, self.token_vocab, test, device=self.device)
             curr_preds = [p[0] for p in curr_preds]
 
