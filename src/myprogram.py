@@ -4,7 +4,6 @@ import string
 import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from utils import load_bloom, next_char as nc
-import torch
 import time
 
 
