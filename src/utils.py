@@ -7,7 +7,7 @@ def load_bloom(work_dir="../work"):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
     filename = "bloom-560m.q8_0.gguf"
-    model = llama_cpp.Llama(model_path=os.path.join(work_dir, filename))
+    model = llama_cpp.Llama(model_path=os.path.join(work_dir, filename), logits_all=True)
 
     # load token vocabulary
     NUM_TOKENS = 250680
