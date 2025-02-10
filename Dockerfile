@@ -15,6 +15,9 @@ RUN apt update && apt install -y \
     ln -s /usr/bin/python3 /usr/bin/python
 
 # Install llama-cpp-python
-RUN pip install --no-cache-dir llama-cpp-python --force-reinstall --upgrade
+RUN pip install --no-cache-dir llama-cpp-python==0.3.4 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu122
+
+# Ensure CUDA libraries are optional at runtime
+RUN echo "/usr/local/cuda/lib64" > /etc/ld.so.conf.d/cuda.conf && ldconfig || true
 
 CMD ["/bin/bash"]
