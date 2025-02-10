@@ -2,22 +2,12 @@ import llama_cpp
 from collections import defaultdict
 import numpy as np
 import os
-import subprocess
-
-def is_cuda_available():
-    try:
-        subprocess.check_output("nvidia-smi")
-        print("cuda available")
-        return True
-    except Exception:
-        print("cuda not available")
-        return False
 
 def load_bloom(work_dir="../work"):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
     filename = "bloom-560m.q8_0.gguf"
-    model = llama_cpp.Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1 if is_cuda_available() else 0)
+    model = llama_cpp.Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1)
 
     # load token vocabulary
     NUM_TOKENS = 250680
