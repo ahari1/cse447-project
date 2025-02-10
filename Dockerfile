@@ -1,4 +1,4 @@
-FROM nvidia/cuda:12.2.0-runtime-ubuntu22.04
+FROM python:3.13-slim
 RUN mkdir /job
 WORKDIR /job
 VOLUME ["/job/data", "/job/src", "/job/work", "/job/output"]
@@ -8,11 +8,11 @@ VOLUME ["/job/data", "/job/src", "/job/work", "/job/output"]
 # RUN pip install gguf
 # RUN pip install accelerate
 
+# RUN apt-get update && apt-get install -y python3 python3-pip
+
 # Install system dependencies
 RUN apt update && apt install -y \
-    python3 python3-pip python3-venv git \
-    build-essential cmake ninja-build && \
-    ln -s /usr/bin/python3 /usr/bin/python
+    build-essential cmake ninja-build git
 
 # Install llama-cpp-python
 RUN pip install --no-cache-dir llama-cpp-python --force-reinstall --upgrade
