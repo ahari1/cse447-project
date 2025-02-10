@@ -9,10 +9,12 @@ VOLUME ["/job/data", "/job/src", "/job/work", "/job/output"]
 # RUN pip install accelerate
 
 # Install system dependencies
-RUN apt update && apt install -y \
-    python3 python3-pip python3-venv git \
-    build-essential cmake ninja-build && \
-    ln -s /usr/bin/python3 /usr/bin/python
+# RUN apt update && apt install -y \
+#     python3 python3-pip python3-venv git \
+#     build-essential cmake ninja-build && \
+#     ln -s /usr/bin/python3 /usr/bin/python
+
+RUN apt-get update && apt-get install -y python3 python3-pip git && ln -s /usr/bin/python3 /usr/bin/python
 
 # Install llama-cpp-python
 RUN pip install --no-cache-dir llama-cpp-python==0.3.4 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu122
