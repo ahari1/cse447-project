@@ -12,7 +12,7 @@ class MyModel:
     This is a starter model to get you started. Feel free to modify this file.
     """
 
-    def __init__(self, model, token_vocab):
+    def __init__(self, model=None, token_vocab=None):
         self.model = model
         self.token_vocab = token_vocab
         self.common_chars = [" ", "e", 'a', 'r', 'i', 'n', 's']
