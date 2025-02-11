@@ -30,7 +30,7 @@ class MyModel:
         data = []
         with open(fname) as f:
             for line in f:
-                inp = line[:-1]  # the last character is a newline
+                inp = line.strip()
                 data.append(inp)
         return data
 
