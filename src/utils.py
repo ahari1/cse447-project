@@ -1,13 +1,27 @@
-import llama_cpp
 from collections import defaultdict
 import numpy as np
 import os
+import subprocess
+import sys
+
+def get_llama():
+    try:
+        subprocess.check_output('nvidia-smi')
+        print('Nvidia GPU detected!', flush=True)
+        has_cuda = True
+        sys.path.insert(0, "/opt/llama-cpp-cuda")
+    except Exception:
+        print("No Nvidia GPU detected!", flush=True)
+        has_cuda = False
+    from llama_cpp import Llama
+    return Llama, has_cuda
 
 def load_bloom(work_dir="../work"):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
+    Llama, use_gpu = get_llama()
     filename = "bloom-560m.q8_0.gguf"
-    model = llama_cpp.Llama(model_path=os.path.join(work_dir, filename), logits_all=True)
+    model = Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1 if use_gpu else 0)
 
     # load token vocabulary
     NUM_TOKENS = 250680

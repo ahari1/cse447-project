@@ -1,0 +1,44 @@
+Bootstrap: docker
+From: nvidia/cuda:12.2.0-runtime-ubuntu22.04
+
+%post
+    mkdir -p /job/data /job/src /job/work /job/output
+    apt-get update && apt-get install -y \
+        python3 python3-pip python3-venv git \
+        build-essential cmake ninja-build \
+        && ln -s /usr/bin/python3 /usr/bin/python
+    
+    # Install llama-cpp-python with CUDA support
+    pip install --no-cache-dir llama-cpp-python==0.3.4 --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu122 --target=/opt/llama-cpp-cuda
+
+    # Install llama-cpp without CUDA
+    pip install --no-cache-dir llama-cpp-python
+
+    # Ensure CUDA is optional at runtime
+    echo "/usr/local/cuda/lib64" > /etc/ld.so.conf.d/cuda.conf && ldconfig || true
+
+    # Create the directories & links for proper bind-mounting:
+    mkdir /scr /mmfs1
+    ln --symbolic /mmfs1/sw /sw
+    ln --symbolic /mmfs1/data /data
+    ln --symbolic /mmfs1/gscratch /gscratch
+
+%environment
+    export PATH=/usr/local/cuda/bin:$PATH
+    export LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+%labels
+    Author your_name
+    Version 1.0
+
+%runscript
+    case ${@} in
+        "")
+            # Launch an interactive shell if no arguments are given:
+            exec /bin/bash
+            ;;
+        *)
+            # If any arguments are given, attempt to run them as a command:
+            exec ${@}
+            ;;
+    esac
