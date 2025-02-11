@@ -30,7 +30,9 @@ class MyModel:
         data = []
         with open(fname) as f:
             for line in f:
-                inp = line.strip()
+                if line[-1] == '\n':
+                    line = line[:-1]
+                inp = line
                 data.append(inp)
         return data
 
