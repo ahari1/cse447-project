@@ -24,7 +24,7 @@ def load_bloom(work_dir="../work"):
     model = Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1 if use_gpu else 0)
 
     # load token vocabulary
-    NUM_TOKENS = 250680
+    NUM_TOKENS = model.n_vocab()
     token_vocab = []
     for token in range(NUM_TOKENS):
         try:
