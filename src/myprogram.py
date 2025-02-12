@@ -30,9 +30,7 @@ class MyModel:
         data = []
         with open(fname) as f:
             for line in f:
-                if line[-1] == '\n':
-                    line = line[:-1]
-                inp = line
+                inp = line.strip('\r\n')
                 data.append(inp)
         return data
 
@@ -47,6 +45,7 @@ class MyModel:
         pass
 
     def run_pred(self, data):
+        t0 = time.time()
         # parallelize this at some point
         preds: list[str] = []
         k = 0
@@ -56,7 +55,7 @@ class MyModel:
                 print(f"{k} in {time.time() - t}s (average {(time.time() - t) / k}s per prediction).")
             k += 1
             curr_preds = nc(self.model, self.token_vocab, test)
-            curr_preds = [p[0] for p in curr_preds if p[0] != "\n"]
+            curr_preds = [p[0] for p in curr_preds if p[0] not in "\u000A\u000B\u000C\u000D\u0085\u2028\u2029"]
 
             if len(curr_preds) < 3:
                 for i in range(len(self.common_chars)):
@@ -68,6 +67,7 @@ class MyModel:
                 curr_preds = curr_preds[:3]
 
             preds.append(''.join(curr_preds))
+        print(f"On average took {(time.time() - t0) / len(preds) * 1000} ms per prediction.")
         return preds
 
     def save(self, work_dir):

@@ -21,7 +21,7 @@ def load_bloom(work_dir="../work"):
     # https://huggingface.co/docs/transformers/en/gguf
     Llama, use_gpu = get_llama()
     filename = "bloom-560m.q8_0.gguf"
-    model = Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1 if use_gpu else 0)
+    model = Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1 if use_gpu else 0, verbose=False)
 
     # load token vocabulary
     NUM_TOKENS = model.n_vocab()
