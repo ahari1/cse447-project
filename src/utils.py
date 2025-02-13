@@ -53,28 +53,31 @@ def next_char(model, token_trie, input_text, lookback=4):
         remaining_text = model.detokenize(tokens[idx+1:]).decode("utf-8")
         curr_logits = logits[idx]
         valid_tokens = [i for token, (i,) in token_trie.iteritems(remaining_text) if len(token) > len(remaining_text)]
-        valid_tokens2 = [token_trie[token] for token in token_trie.prefixes(remaining_text)]
+        # valid_tokens2 = [token_trie[token] for token in token_trie.prefixes(remaining_text)]
         # valid_tokens = [i for i, token in enumerate(token_vocab) if len(token) > len(remaining_text) and token.startswith(remaining_text)]
         # valid_tokens2 = [i for i, token in enumerate(token_vocab) if len(token) <= len(remaining_text) and remaining_text.startswith(token)]
         if len(valid_tokens) <= 0:
             mask = np.zeros(curr_logits.shape, dtype=bool)
-            mask[valid_tokens2] = True
+            # mask[valid_tokens2] = True
             mask[valid_tokens] = True
             processed_logits = np.where(mask, curr_logits, -np.inf)
+            processed_logits[tokens[idx+1]] = curr_logits[tokens[idx+1]]
             curr_prob = softmax(processed_logits)
             next_token_prob = max(curr_prob[tokens[idx+1]].item(), 1e-2)
             location_prob *= next_token_prob
             continue
         else:
             mask = np.zeros(curr_logits.shape, dtype=bool)
-            mask2 = np.zeros(curr_logits.shape, dtype=bool)
-            mask2[valid_tokens2] = True
+            # mask2 = np.zeros(curr_logits.shape, dtype=bool)
+            # mask2[valid_tokens2] = True
             mask[valid_tokens] = True
-            processed_logits = np.where(mask | mask2, curr_logits, -np.inf)
-            curr_prob = softmax(processed_logits, axis=-1)
+            processed_logits = np.where(mask, curr_logits, -np.inf)
             if idx < num_tokens - 1:
+                processed_logits[tokens[idx+1]] = curr_logits[tokens[idx+1]]
+                curr_prob = softmax(processed_logits)
                 next_token_prob = max(curr_prob[tokens[idx+1]].item(), 1e-2)
             else:
+                curr_prob = softmax(processed_logits)
                 next_token_prob = 1
             indices = np.argpartition(curr_prob, -100)[-100:]
             top_probs = curr_prob[indices]
