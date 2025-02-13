@@ -20,7 +20,7 @@ def load_bloom(work_dir="../work"):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
     Llama, use_gpu = get_llama()
-    filename = "bloom-560m.q8_0.gguf"
+    filename = "Llama-3.2-1B.Q5_K_M.gguf"
     model = Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1 if use_gpu else 0, verbose=False)
 
     # load token vocabulary
@@ -43,11 +43,6 @@ def softmax(x, axis=None):
 
 def next_char(model, token_vocab, input_text, lookback=4):
     tokens = model.tokenize(input_text.encode("utf-8"))
-    if input_text.endswith(". "):
-        # hacky because tokenizer is dumb as a rock
-        tokens = tokens[:-1] + [17, 210]
-    elif input_text.endswith(", "):
-        tokens = tokens[:-1] + [15, 210]
     # Evaluate model
     model(tokens, max_tokens=1)
     logits = model._scores

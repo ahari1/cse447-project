@@ -4,7 +4,7 @@
 IMAGE="./hyak_container.sif"  # Assuming you have converted your container to a SIF file
 SRC_DIR="$PWD/src"
 WORK_DIR="$PWD/work"
-DATA_DIR="$PWD/example"
+DATA_DIR="$PWD/src/data/en/"
 OUTPUT_DIR="$PWD/output"
 SCRIPT_PATH="/job/src/predict.sh"
 INPUT_FILE="/job/data/input.txt"
