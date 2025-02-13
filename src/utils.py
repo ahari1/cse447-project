@@ -3,6 +3,7 @@ import numpy as np
 import os
 import subprocess
 import sys
+import marisa_trie
 
 def get_llama():
     try:
@@ -32,16 +33,15 @@ def load_bloom(work_dir="../work"):
         except UnicodeDecodeError:
             # Handle the error, e.g., by replacing the invalid token with a placeholder
             decoded_token = f"[INVALID TOKEN {token}]"
-        token_vocab.append(decoded_token)
-    return model, token_vocab
+        token_vocab.append((decoded_token, (token,)))
+    token_trie = marisa_trie.RecordTrie("@i", token_vocab)
+    return model, token_trie
 
-def softmax(x, axis=None):
-    max_val = np.max(x, axis=axis, keepdims=True)
-    exp_x = np.exp(x - max_val)
-    sum_exp_x = np.sum(exp_x, axis=axis, keepdims=True)
-    return exp_x / sum_exp_x
+def softmax(x):
+    e_x = np.exp(x - np.max(x))
+    return e_x / e_x.sum(axis=-1)
 
-def next_char(model, token_vocab, input_text, lookback=4):
+def next_char(model, token_trie, input_text, lookback=4):
     tokens = model.tokenize(input_text.encode("utf-8"))
     # Evaluate model
     model(tokens, max_tokens=1)
@@ -49,17 +49,19 @@ def next_char(model, token_vocab, input_text, lookback=4):
     results = defaultdict(float)
     num_tokens = len(tokens)
     location_prob = 1
-    for idx in range(max(0, num_tokens - lookback) + 1, num_tokens):
+    for idx in range(max(0, num_tokens - lookback), num_tokens):
         remaining_text = model.detokenize(tokens[idx+1:]).decode("utf-8")
         curr_logits = logits[idx]
-        valid_tokens = [i for i, token in enumerate(token_vocab) if len(token) > len(remaining_text) and token.startswith(remaining_text)]
-        valid_tokens2 = [i for i, token in enumerate(token_vocab) if len(token) <= len(remaining_text) and remaining_text.startswith(token)]
+        valid_tokens = [i for token, (i,) in token_trie.iteritems(remaining_text) if len(token) > len(remaining_text)]
+        valid_tokens2 = [token_trie[token] for token in token_trie.prefixes(remaining_text)]
+        # valid_tokens = [i for i, token in enumerate(token_vocab) if len(token) > len(remaining_text) and token.startswith(remaining_text)]
+        # valid_tokens2 = [i for i, token in enumerate(token_vocab) if len(token) <= len(remaining_text) and remaining_text.startswith(token)]
         if len(valid_tokens) <= 0:
             mask = np.zeros(curr_logits.shape, dtype=bool)
             mask[valid_tokens2] = True
             mask[valid_tokens] = True
             processed_logits = np.where(mask, curr_logits, -np.inf)
-            curr_prob = softmax(processed_logits, axis=-1)
+            curr_prob = softmax(processed_logits)
             next_token_prob = max(curr_prob[tokens[idx+1]].item(), 1e-2)
             location_prob *= next_token_prob
             continue
@@ -69,21 +71,19 @@ def next_char(model, token_vocab, input_text, lookback=4):
             mask2[valid_tokens2] = True
             mask[valid_tokens] = True
             processed_logits = np.where(mask | mask2, curr_logits, -np.inf)
+            curr_prob = softmax(processed_logits, axis=-1)
             if idx < num_tokens - 1:
-                processed_logits[tokens[idx]] = curr_logits[tokens[idx]]
-                curr_prob = softmax(processed_logits, axis=-1)
                 next_token_prob = max(curr_prob[tokens[idx+1]].item(), 1e-2)
             else:
-                curr_prob = softmax(processed_logits, axis=-1)
                 next_token_prob = 1
             indices = np.argpartition(curr_prob, -100)[-100:]
             top_probs = curr_prob[indices]
-            token_vals = [model.detokenize([i]) for i in indices]
-            for prob, index, token_val in zip(top_probs, indices, token_vals):
+            for prob, index in zip(top_probs, indices):
+                if prob < 1e-4:
+                    continue
                 if mask[index]:
-                    if prob < 1e-4:
-                        continue
                     try:
+                        token_val = model.detokenize([index])
                         token_char = token_val.decode("utf-8")[len(remaining_text)]
                         # print(idx, prob.item(), f'"{token_val}"', f"'{token_char}'")
                         results[token_char] += prob.item() * location_prob
