@@ -15,6 +15,9 @@ RUN pip install --no-cache-dir llama-cpp-python==0.3.4 --extra-index-url https:/
 # Install llama-cpp without cuda
 RUN pip install --no-cache-dir llama-cpp-python
 
+# Install trie library
+RUN pip install marisa-trie
+
 # Ensure CUDA is optional at runtime
 RUN echo "/usr/local/cuda/lib64" > /etc/ld.so.conf.d/cuda.conf && ldconfig || true
 
