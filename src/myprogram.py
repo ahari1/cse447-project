@@ -51,20 +51,23 @@ class MyModel:
         k = 0
         t = time.time()
         for test in data:
-            if k > 0 and k % 50 == 0:
-                print(f"{k} in {time.time() - t}s (average {(time.time() - t) / k}s per prediction).")
-            k += 1
-            curr_preds = nc(self.model, self.token_vocab, test)
-            curr_preds = [p[0] for p in curr_preds if p[0] not in "\u000A\u000B\u000C\u000D\u0085\u2028\u2029"]
+            try:
+                if k > 0 and k % 50 == 0:
+                    print(f"{k} in {time.time() - t}s (average {(time.time() - t) / k}s per prediction).")
+                k += 1
+                curr_preds = nc(self.model, self.token_vocab, test)
+                curr_preds = [p[0] for p in curr_preds if p[0] not in "\u000A\u000B\u000C\u000D\u0085\u2028\u2029"]
 
-            if len(curr_preds) < 3:
-                for i in range(len(self.common_chars)):
-                    if self.common_chars[i] not in preds:
-                        curr_preds.append(self.common_chars[i])
-                    if len(curr_preds) >=3:
-                        break
-            else:
-                curr_preds = curr_preds[:3]
+                if len(curr_preds) < 3:
+                    for i in range(len(self.common_chars)):
+                        if self.common_chars[i] not in preds:
+                            curr_preds.append(self.common_chars[i])
+                        if len(curr_preds) >=3:
+                            break
+                else:
+                    curr_preds = curr_preds[:3]
+            except:
+                curr_preds = [" ", "e", "a"]
 
             preds.append(''.join(curr_preds))
         print(f"On average took {(time.time() - t0) / len(preds) * 1000} ms per prediction.")
