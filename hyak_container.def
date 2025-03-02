@@ -14,6 +14,8 @@ From: nvidia/cuda:12.2.0-runtime-ubuntu22.04
     # Install llama-cpp without CUDA
     pip install --no-cache-dir llama-cpp-python
 
+    pip install --no-cache-dir marisa-trie
+
     # Ensure CUDA is optional at runtime
     echo "/usr/local/cuda/lib64" > /etc/ld.so.conf.d/cuda.conf && ldconfig || true
 
