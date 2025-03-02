@@ -5,6 +5,7 @@ import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from utils import load_bloom, next_char as nc
 import time
+import matplotlib.pyplot as plt
 
 
 class MyModel:
@@ -45,18 +46,20 @@ class MyModel:
         pass
 
     def run_pred(self, data):
-        t0 = time.time()
+        batch_size = 32
+
         # parallelize this at some point
         preds: list[str] = []
-        k = 0
-        t = time.time()
-        for test in data:
+        eval_times = []
+        filtering_times = []
+        input_lengths = []
+
+        for i in range(0, len(data), batch_size):
+            batch = data[i:i + batch_size]
+            batch_results = nc(self.model, self.token_vocab, batch)
             try:
-                if k > 0 and k % 50 == 0:
-                    print(f"{k} in {time.time() - t}s (average {(time.time() - t) / k}s per prediction).")
-                k += 1
-                curr_preds = nc(self.model, self.token_vocab, test)
-                curr_preds = [p[0] for p in curr_preds if p[0] not in "\u000A\u000B\u000C\u000D\u0085\u2028\u2029"]
+                for j, (curr_preds, eval_time, filtering_time) in enumerate(batch_results):
+                    curr_preds = [p[0] for p in curr_preds if p[0] not in "\u000A\u000B\u000C\u000D\u0085\u2028\u2029"]
 
                 if len(curr_preds) < 3:
                     for i in range(len(self.common_chars)):
@@ -70,8 +73,13 @@ class MyModel:
                 curr_preds = [" ", "e", "a"]
 
             preds.append(''.join(curr_preds))
-        print(f"On average took {(time.time() - t0) / len(preds) * 1000} ms per prediction.")
-        return preds
+            eval_times.append(eval_time)
+            filtering_times.append(filtering_time)
+            input_lengths.append(len(batch[j]))
+
+        # Plot the time taken for each prediction with respect to the number of characters in the input
+
+        return preds, eval_times, filtering_times
 
     def save(self, work_dir):
         # your code here
