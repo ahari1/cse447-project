@@ -67,11 +67,12 @@ def filtering_step(logit_info, tokens, input_text, lookback):
     t1 = time.time()
     start_pos = max(0, num_tokens - lookback)
     for idx in range(start_pos, num_tokens):
-        try:
-            remaining_text = b''.join([vocab[i] for i in range(idx+1, len(tokens))]).decode("utf-8")
-        except:
-            # just skip
-            continue
+        remaining_text = ''.join([vocab[i] for i in range(idx+1, len(tokens))])
+        # try:
+        #     remaining_text = b''.join([vocab[i] for i in range(idx+1, len(tokens))]).decode("utf-8")
+        # except:
+        #     # just skip
+        #     continue
         curr_logits = logits[idx - start_pos]
         valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
         if len(valid_tokens) <= 0:
