@@ -5,7 +5,7 @@ import subprocess
 import sys
 import marisa_trie
 import time
-import multiprocessing
+from multiprocessing import Pool, shared_memory
 
 def get_llama():
     try:
@@ -48,7 +48,7 @@ def init_worker(token_vocab, token_trie):
 
 def init_pool(token_vocab, token_trie):
     """Loads the multiprocessing pool"""
-    pool = multiprocessing.Pool(initializer=init_worker, initargs=(token_vocab,token_trie), processes=4)
+    pool = Pool(initializer=init_worker, initargs=(token_vocab,token_trie), processes=4)
     return pool
 
 def softmax(x, axis=None):
@@ -57,18 +57,20 @@ def softmax(x, axis=None):
     sum_exp_x = np.sum(exp_x, axis=axis, keepdims=True)
     return exp_x / sum_exp_x
 
-def filtering_step(logits, tokens, input_text, lookback):
+def filtering_step(logit_info, tokens, input_text, lookback):
     results = defaultdict(float)
     num_tokens = len(tokens)
     location_prob = 1
+    shm_name, shape, dtype = logit_info
+    logits = np.ndarray(shape, dtype=dtype, buffer=shm.buf)
     t1 = time.time()
-    for idx in range(max(0, num_tokens - lookback) + 1, num_tokens):
+    for idx in range(max(0, num_tokens - lookback - 1), num_tokens):
         try:
             remaining_text = b''.join([vocab[i] for i in range(idx+1, len(tokens))]).decode("utf-8")
         except:
             # just skip
             continue
-        curr_logits = logits[idx]
+        curr_logits = logits[idx - num_tokens + lookback + 1]
         valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
         if len(valid_tokens) <= 0:
             location_prob *= 1e-2
@@ -104,6 +106,9 @@ def filtering_step(logits, tokens, input_text, lookback):
     filtering_time = time.time() - t1
     print(f"Filtering took {(filtering_time) * 1000} milliseconds.")
 
+    # delete shared memory
+    shm.close()
+    shm.unlink()
     # compute pseudo probability
     return sorted(results.items(), key=lambda x: x[1], reverse=True), filtering_time
 
@@ -122,8 +127,17 @@ def next_char(model, pool, token_vocab, token_trie, input_texts, lookback=4):
         eval_time = time.time() - t0
         eval_times.append(eval_time)
 
+        # use shared memory for greater speed
+        logits = model._scores[-lookback:]
+        shm = shared_memory.SharedMemory(create=True, size=logits.nbytes)
+        shm_logits = np.ndarray(logits.shape, dtype=logits.dtype, buffer=shm.buf)
+        np.copyto(shm_logits, logits)
+
         # run filtering in separate process
-        pool_results.append(pool.apply_async(filtering_step, (model._scores, tokens, input_text, lookback)))
+        pool_results.append(pool.apply_async(filtering_step, ((shm.name, shm_logits.shape, shm_logits.dtype), tokens, input_text, lookback)))
+
+        # only main releases access to shared memory, workers can still access it
+        shm.close()
 
     results = []
     # gather results from pool

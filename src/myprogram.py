@@ -57,6 +57,7 @@ class MyModel:
         input_lengths = []
 
         for i in range(0, len(data), batch_size):
+            start = time.time()
             batch = data[i:min(i + batch_size, len(data))]
             batch_results = nc(self.model, pool, self.token_vocab, self.token_trie, batch)
             try:
@@ -85,6 +86,9 @@ class MyModel:
             eval_times.extend(curr_eval_times)
             filtering_times.extend(curr_filtering_times)
             input_lengths.extend(len(batch[j]) for j in range(i, min(i+batch_size, len(data))))
+
+            batch_time = time.time() - start
+            print(f"Batch took {batch_time * 1000} milliseconds, average {batch_time * 1000 / batch_size} per batch")
 
         # close the pool
         pool.close()
