@@ -85,10 +85,10 @@ class MyModel:
             preds.extend(''.join(pred) for pred in batch_preds)
             eval_times.extend(curr_eval_times)
             filtering_times.extend(curr_filtering_times)
-            input_lengths.extend(len(batch[j]) for j in range(i, min(i+batch_size, len(data))))
+            input_lengths.extend(len(b) for b in batch)
 
             batch_time = time.time() - start
-            print(f"Batch took {batch_time * 1000} milliseconds, average {batch_time * 1000 / batch_size} per batch")
+            print(f"Batch took {batch_time * 1000} milliseconds, average {batch_time * 1000 / len(batch)} ms per line")
 
         # close the pool
         pool.close()

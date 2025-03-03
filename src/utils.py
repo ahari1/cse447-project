@@ -62,15 +62,17 @@ def filtering_step(logit_info, tokens, input_text, lookback):
     num_tokens = len(tokens)
     location_prob = 1
     shm_name, shape, dtype = logit_info
+    shm = shared_memory.SharedMemory(name=shm_name)
     logits = np.ndarray(shape, dtype=dtype, buffer=shm.buf)
     t1 = time.time()
-    for idx in range(max(0, num_tokens - lookback - 1), num_tokens):
+    start_pos = max(0, num_tokens - lookback)
+    for idx in range(start_pos, num_tokens):
         try:
             remaining_text = b''.join([vocab[i] for i in range(idx+1, len(tokens))]).decode("utf-8")
         except:
             # just skip
             continue
-        curr_logits = logits[idx - num_tokens + lookback + 1]
+        curr_logits = logits[idx - start_pos]
         valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
         if len(valid_tokens) <= 0:
             location_prob *= 1e-2
@@ -108,13 +110,13 @@ def filtering_step(logit_info, tokens, input_text, lookback):
 
     # delete shared memory
     shm.close()
-    shm.unlink()
     # compute pseudo probability
     return sorted(results.items(), key=lambda x: x[1], reverse=True), filtering_time
 
 def next_char(model, pool, token_vocab, token_trie, input_texts, lookback=4):
     eval_times = []
     pool_results = []
+    shms = []
     for input_text in input_texts:
         # Run model
         tokens = model.tokenize(input_text.encode("utf-8"))
@@ -136,12 +138,14 @@ def next_char(model, pool, token_vocab, token_trie, input_texts, lookback=4):
         # run filtering in separate process
         pool_results.append(pool.apply_async(filtering_step, ((shm.name, shm_logits.shape, shm_logits.dtype), tokens, input_text, lookback)))
 
-        # only main releases access to shared memory, workers can still access it
-        shm.close()
+        shms.append(shm)
 
     results = []
     # gather results from pool
-    for eval_time, pool_result in zip(eval_times, pool_results):
+    for eval_time, pool_result, shm in zip(eval_times, pool_results, shms):
         preds, filtering_time = pool_result.get()
         results.append((preds, eval_time, filtering_time))
+        # close shared memory object
+        shm.close()
+        shm.unlink()
     return results
