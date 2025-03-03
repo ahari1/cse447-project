@@ -1,6 +1,7 @@
 import time
 import matplotlib.pyplot as plt
 from myprogram import MyModel
+import cProfile
 
 eval_times = []
 filtering_times = []
@@ -166,7 +167,11 @@ def main():
     model = MyModel.load(work_dir)
 
     input_lengths = [len(data) for data in test_data]
+    # def get_times():
+    #     return [measure_run_pred(model, [data]) for data in test_data]
+    # times = cProfile.runctx("get_times()", globals(), locals())
     times = [measure_run_pred(model, [data]) for data in test_data]
+    
 
     # plt.figure(figsize=(10, 6))
     # plt.scatter(input_lengths, times)
@@ -177,7 +182,7 @@ def main():
 
 
     # Plot the time taken for each prediction with respect to the number of characters in the input
-    plt.figure(figsize=(10, 6))
+    fig = plt.figure(figsize=(10, 6))
     plt.scatter(input_lengths, eval_times, label='Evaluation Time', color='blue')
     plt.scatter(input_lengths, filtering_times, label='Filtering Time', color='red')
     plt.xlabel('Num Characters')
@@ -185,7 +190,8 @@ def main():
     plt.title('Evaluation and Filtering Time vs Number of Characters')
     plt.legend()
     plt.grid(True)
-    plt.show()
+    fig.savefig("times.png")
+    # plt.show()
 
 if __name__ == '__main__':
     main()

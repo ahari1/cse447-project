@@ -3,19 +3,19 @@ import os
 import string
 import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from utils import load_bloom, next_char as nc
+from utils import load_bloom, next_char as nc, init_pool
 import time
 import matplotlib.pyplot as plt
-
 
 class MyModel:
     """
     This is a starter model to get you started. Feel free to modify this file.
     """
 
-    def __init__(self, model=None, token_vocab=None):
+    def __init__(self, model=None, token_vocab=None, token_trie=None):
         self.model = model
         self.token_vocab = token_vocab
+        self.token_trie = token_trie
         self.common_chars = [" ", "e", 'a', 'r', 'i', 'n', 's']
         
 
@@ -46,6 +46,8 @@ class MyModel:
         pass
 
     def run_pred(self, data):
+        # initialize multiprocessing pool
+        pool = init_pool(self.token_vocab, self.token_trie)
         batch_size = 32
 
         # parallelize this at some point
@@ -55,28 +57,38 @@ class MyModel:
         input_lengths = []
 
         for i in range(0, len(data), batch_size):
-            batch = data[i:i + batch_size]
-            batch_results = nc(self.model, self.token_vocab, batch)
+            batch = data[i:min(i + batch_size, len(data))]
+            batch_results = nc(self.model, pool, self.token_vocab, self.token_trie, batch)
             try:
+                curr_eval_times = []
+                curr_filtering_times = []
+                batch_preds = []
                 for j, (curr_preds, eval_time, filtering_time) in enumerate(batch_results):
                     curr_preds = [p[0] for p in curr_preds if p[0] not in "\u000A\u000B\u000C\u000D\u0085\u2028\u2029"]
+                    curr_eval_times.append(eval_time)
+                    curr_filtering_times.append(filtering_time)
 
-                if len(curr_preds) < 3:
-                    for i in range(len(self.common_chars)):
-                        if self.common_chars[i] not in preds:
-                            curr_preds.append(self.common_chars[i])
-                        if len(curr_preds) >=3:
-                            break
-                else:
-                    curr_preds = curr_preds[:3]
+                    if len(curr_preds) < 3:
+                        for i in range(len(self.common_chars)):
+                            if self.common_chars[i] not in preds:
+                                curr_preds.append(self.common_chars[i])
+                            if len(curr_preds) >=3:
+                                break
+                    else:
+                        curr_preds = curr_preds[:3]
+
+                    batch_preds.append(curr_preds)
             except:
-                curr_preds = [" ", "e", "a"]
+                batch_preds = [[" ", "e", "a"]] * len(batch)
 
-            preds.append(''.join(curr_preds))
-            eval_times.append(eval_time)
-            filtering_times.append(filtering_time)
-            input_lengths.append(len(batch[j]))
+            preds.extend(''.join(pred) for pred in batch_preds)
+            eval_times.extend(curr_eval_times)
+            filtering_times.extend(curr_filtering_times)
+            input_lengths.extend(len(batch[j]) for j in range(i, min(i+batch_size, len(data))))
 
+        # close the pool
+        pool.close()
+        pool.join()
         # Plot the time taken for each prediction with respect to the number of characters in the input
 
         return preds, eval_times, filtering_times
@@ -92,8 +104,8 @@ class MyModel:
         # your code here
         # this particular model has nothing to load, but for demonstration purposes we will load a blank file
         
-        model, token_vocab = load_bloom(work_dir)
-        instance = cls(model, token_vocab)
+        model, token_vocab, token_trie = load_bloom(work_dir)
+        instance = cls(model, token_vocab, token_trie)
         # instance.model = model
         # instance.token_vocab = token_vocab
         # with open(os.path.join(work_dir, 'model.checkpoint')) as f:
