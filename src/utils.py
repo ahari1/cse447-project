@@ -3,7 +3,7 @@ import numpy as np
 import os
 import subprocess
 import sys
-import marisa_trie
+import marisa_ext
 import time
 from multiprocessing import Pool, shared_memory
 
@@ -39,19 +39,18 @@ def load_bloom(work_dir="../work"):
             decoded_token = f"."
         decoded_tokens.append(decoded_token)
         token_vocab.append(token_bytes)
-    token_trie = marisa_trie.RecordTrie("@i", [(token, (i,)) for i, token in enumerate(decoded_tokens)])
-    return model, token_vocab, token_trie
+    global trie
+    trie = marisa_ext.FastTrie(decoded_tokens)
+    return model, token_vocab
 
-def init_worker(token_vocab, token_trie):
+def init_worker(token_vocab):
     """Function used to initialize shared data for workers"""
     global vocab
-    global trie
-    trie = token_trie
     vocab = token_vocab
 
-def init_pool(token_vocab, token_trie):
+def init_pool(token_vocab):
     """Loads the multiprocessing pool"""
-    pool = Pool(initializer=init_worker, initargs=(token_vocab,token_trie), processes=4)
+    pool = Pool(initializer=init_worker, initargs=(token_vocab), processes=4)
     return pool
 
 def softmax(x, axis=None):
@@ -77,7 +76,8 @@ def filtering_step(logit_info, tokens, input_text, lookback):
             print("ERROR")
             continue
         curr_logits = logits[idx - start_pos]
-        valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
+        # valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
+        valid_tokens = trie.get_valid_tokens(remaining_text)
         if len(valid_tokens) <= 0:
             location_prob *= 1e-2
             continue
@@ -117,7 +117,7 @@ def filtering_step(logit_info, tokens, input_text, lookback):
     # compute pseudo probability
     return sorted(results.items(), key=lambda x: x[1], reverse=True), filtering_time
 
-def next_char(model, pool, token_vocab, token_trie, input_texts, lookback=4):
+def next_char(model, pool, input_texts, lookback=4):
     eval_times = []
     pool_results = []
     shms = []

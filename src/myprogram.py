@@ -15,7 +15,7 @@ class MyModel:
     def __init__(self, model=None, token_vocab=None, token_trie=None):
         self.model = model
         self.token_vocab = token_vocab
-        self.token_trie = token_trie
+        # self.token_trie = token_trie
         self.common_chars = [" ", "e", 'a', 'r', 'i', 'n', 's']
         
 
@@ -59,7 +59,7 @@ class MyModel:
         for i in range(0, len(data), batch_size):
             start = time.time()
             batch = data[i:min(i + batch_size, len(data))]
-            batch_results = nc(self.model, pool, self.token_vocab, self.token_trie, batch)
+            batch_results = nc(self.model, pool, batch)
             try:
                 curr_eval_times = []
                 curr_filtering_times = []
@@ -109,8 +109,8 @@ class MyModel:
         # your code here
         # this particular model has nothing to load, but for demonstration purposes we will load a blank file
         
-        model, token_vocab, token_trie = load_bloom(work_dir)
-        instance = cls(model, token_vocab, token_trie)
+        model, token_vocab = load_bloom(work_dir)
+        instance = cls(model, token_vocab)
         # instance.model = model
         # instance.token_vocab = token_vocab
         # with open(os.path.join(work_dir, 'model.checkpoint')) as f:
