@@ -47,7 +47,7 @@ class MyModel:
 
     def run_pred(self, data):
         # initialize multiprocessing pool
-        pool = init_pool(self.token_vocab, self.token_trie)
+        pool = init_pool(self.token_vocab)
         batch_size = 32
 
         # parallelize this at some point
