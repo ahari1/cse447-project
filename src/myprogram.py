@@ -95,8 +95,8 @@ class MyModel:
         pool.join()
         # Plot the time taken for each prediction with respect to the number of characters in the input
 
-        return preds, eval_times, filtering_times
-        # return preds
+        # return preds, eval_times, filtering_times
+        return preds
 
     def save(self, work_dir):
         # your code here

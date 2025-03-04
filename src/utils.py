@@ -29,14 +29,17 @@ def load_bloom(work_dir="../work"):
     # load token vocabulary
     NUM_TOKENS = model.n_vocab()
     token_vocab = []
+    decoded_tokens = []
     for token in range(NUM_TOKENS):
+        token_bytes = model.detokenize([token])
         try:
-            decoded_token = model.detokenize([token]).decode("utf-8")
+            decoded_token = token_bytes.decode("utf-8")
         except UnicodeDecodeError:
             # Handle the error, e.g., by replacing the invalid token with a placeholder
-            decoded_token = f"[INVALID TOKEN {token}]"
-        token_vocab.append(decoded_token)
-    token_trie = marisa_trie.RecordTrie("@i", [(token, (i,)) for i, token in enumerate(token_vocab)])
+            decoded_token = f"."
+        decoded_tokens.append(decoded_token)
+        token_vocab.append(token_bytes)
+    token_trie = marisa_trie.RecordTrie("@i", [(token, (i,)) for i, token in enumerate(decoded_tokens)])
     return model, token_vocab, token_trie
 
 def init_worker(token_vocab, token_trie):
@@ -67,12 +70,12 @@ def filtering_step(logit_info, tokens, input_text, lookback):
     t1 = time.time()
     start_pos = max(0, num_tokens - lookback)
     for idx in range(start_pos, num_tokens):
-        remaining_text = ''.join([vocab[i] for i in range(idx+1, len(tokens))])
-        # try:
-        #     remaining_text = b''.join([vocab[i] for i in range(idx+1, len(tokens))]).decode("utf-8")
-        # except:
-        #     # just skip
-        #     continue
+        try:
+            remaining_text = b''.join([vocab[tokens[i]] for i in range(idx+1, len(tokens))]).decode("utf-8")
+        except:
+            # just skip
+            print("ERROR")
+            continue
         curr_logits = logits[idx - start_pos]
         valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
         if len(valid_tokens) <= 0:
