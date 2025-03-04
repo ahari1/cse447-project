@@ -50,7 +50,7 @@ def init_worker(token_vocab):
 
 def init_pool(token_vocab):
     """Loads the multiprocessing pool"""
-    pool = Pool(initializer=init_worker, initargs=(token_vocab), processes=4)
+    pool = Pool(initializer=init_worker, initargs=(token_vocab,), processes=4)
     return pool
 
 def softmax(x, axis=None):

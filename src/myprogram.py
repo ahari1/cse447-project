@@ -5,7 +5,7 @@ import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
 from utils import load_bloom, next_char as nc, init_pool
 import time
-import matplotlib.pyplot as plt
+# import matplotlib.pyplot as plt
 
 class MyModel:
     """
