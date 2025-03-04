@@ -7,6 +7,7 @@
 
 import os
 from argparse import ArgumentParser
+import random
 
 parser = ArgumentParser()
 parser.add_argument('name')
@@ -22,7 +23,7 @@ if __name__ == '__main__':
     xs = []
     ys = []
 
-    for i in range(min(200, len(lines))):
+    for i in range(min(20000, len(lines))):
         line = lines[i].strip()
         check = True
         while check:
@@ -47,11 +48,11 @@ if __name__ == '__main__':
         line = line.replace("' il ", "'ll ")
         line = line.replace('- ', '-')
         line = line.strip()
-        for j in range(2, len(line)):
-            x = line[:j]
-            y = line[j]
-            xs.append(x)
-            ys.append(y)
+        if len(line) < 15:
+            continue
+        j = int(random.random() * (len(line) - 3)) + 3
+        xs.append(line[:j])
+        ys.append(line[j])
 
     xstr = '\n'.join(xs)
     ystr = '\n'.join(ys)
