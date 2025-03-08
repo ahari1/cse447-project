@@ -112,7 +112,7 @@ def process_input(input_text, lookback):
             indices = np.argpartition(curr_prob, max(-100, -len(valid_tokens)))[-100:]
             top_probs = curr_prob[indices]
             orig_indices = valid_tokens[indices]
-            token_vals = [vocab[i] for i in indices]
+            token_vals = [vocab[i] for i in orig_indices]
             for prob, index, token_val in zip(top_probs, orig_indices, token_vals):
                 if prob < 1e-4:
                     continue
