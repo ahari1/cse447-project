@@ -48,7 +48,7 @@ class MyModel:
 
     def run_pred(self, data):
         # initialize multiprocessing pool
-        batch_size = 32
+        batch_size = 64
 
         # parallelize this at some point
         preds: list[str] = []
