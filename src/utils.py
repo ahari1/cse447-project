@@ -83,7 +83,10 @@ def process_input(input_text, lookback):
             continue
         curr_logits = logits[idx - start_pos]
         # valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
-        valid_tokens = np.array(trie.get_valid_tokens(remaining_text))
+        if remaining_text:
+            valid_tokens = np.array(trie.get_valid_tokens(remaining_text))
+        else:
+            valid_tokens = np.arange(len(vocab))
         if len(valid_tokens) <= 0:
             location_prob *= 1e-2
             continue
