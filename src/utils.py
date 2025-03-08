@@ -5,7 +5,7 @@ import subprocess
 import sys
 import marisa_ext
 import time
-from multiprocessing import Pool, shared_memory
+from multiprocessing import Pool
 
 def get_llama():
     try:
@@ -19,7 +19,7 @@ def get_llama():
     from llama_cpp import Llama
     return Llama, has_cuda
 
-def load_bloom(work_dir="../work"):
+def load_bloom(work_dir):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
     Llama, use_gpu = get_llama()
@@ -39,18 +39,18 @@ def load_bloom(work_dir="../work"):
             decoded_token = f"."
         decoded_tokens.append(decoded_token)
         token_vocab.append(token_bytes)
-    global trie
-    trie = marisa_ext.FastTrie(decoded_tokens)
-    return model, token_vocab
 
-def init_worker(token_vocab):
+    token_trie = marisa_ext.FastTrie(decoded_tokens)
+    return model, token_trie, token_vocab
+
+def init_worker(work_dir):
     """Function used to initialize shared data for workers"""
-    global vocab
-    vocab = token_vocab
+    global trie, vocab, model
+    model, trie, vocab = load_bloom(work_dir)
 
-def init_pool(token_vocab):
+def init_pool(work_dir="../work"):
     """Loads the multiprocessing pool"""
-    pool = Pool(initializer=init_worker, initargs=(token_vocab,), processes=4)
+    pool = Pool(initializer=init_worker, initargs=(work_dir,), processes=4)
     return pool
 
 def softmax(x, axis=None):
@@ -59,13 +59,19 @@ def softmax(x, axis=None):
     sum_exp_x = np.sum(exp_x, axis=axis, keepdims=True)
     return exp_x / sum_exp_x
 
-def filtering_step(logit_info, tokens, input_text, lookback):
+def process_input(input_text, lookback):
+    tokens = model.tokenize(input_text.encode("utf-8"))
+    if input_text.endswith(". "):
+        tokens = tokens[:-1] + [17, 210]
+    elif input_text.endswith(", "):
+        tokens = tokens[:-1] + [15, 210]
+    t0 = time.time()
+    model(tokens, max_tokens=1)
+    eval_time = time.time() - t0
     results = defaultdict(float)
     num_tokens = len(tokens)
     location_prob = 1
-    shm_name, shape, dtype = logit_info
-    shm = shared_memory.SharedMemory(name=shm_name)
-    logits = np.ndarray(shape, dtype=dtype, buffer=shm.buf)
+    logits = model._scores[-lookback:]
     t1 = time.time()
     start_pos = max(0, num_tokens - lookback)
     for idx in range(start_pos, num_tokens):
@@ -112,44 +118,17 @@ def filtering_step(logit_info, tokens, input_text, lookback):
     filtering_time = time.time() - t1
     print(f"Filtering took {(filtering_time) * 1000} milliseconds.")
 
-    # delete shared memory
-    shm.close()
     # compute pseudo probability
-    return sorted(results.items(), key=lambda x: x[1], reverse=True), filtering_time
+    return sorted(results.items(), key=lambda x: x[1], reverse=True), eval_time, filtering_time
 
-def next_char(model, pool, input_texts, lookback=4):
-    eval_times = []
+def next_char(pool, input_texts, lookback=4):
     pool_results = []
-    shms = []
     for input_text in input_texts:
-        # Run model
-        tokens = model.tokenize(input_text.encode("utf-8"))
-        if input_text.endswith(". "):
-            tokens = tokens[:-1] + [17, 210]
-        elif input_text.endswith(", "):
-            tokens = tokens[:-1] + [15, 210]
-        t0 = time.time()
-        model(tokens, max_tokens=1)
-        eval_time = time.time() - t0
-        eval_times.append(eval_time)
-
-        # use shared memory for greater speed
-        logits = model._scores[-lookback:]
-        shm = shared_memory.SharedMemory(create=True, size=logits.nbytes)
-        shm_logits = np.ndarray(logits.shape, dtype=logits.dtype, buffer=shm.buf)
-        np.copyto(shm_logits, logits)
-
-        # run filtering in separate process
-        pool_results.append(pool.apply_async(filtering_step, ((shm.name, shm_logits.shape, shm_logits.dtype), tokens, input_text, lookback)))
-
-        shms.append(shm)
+        pool_results.append(pool.apply_async(process_input, (input_text, lookback)))
 
     results = []
     # gather results from pool
-    for eval_time, pool_result, shm in zip(eval_times, pool_results, shms):
-        preds, filtering_time = pool_result.get()
+    for pool_result in pool_results:
+        preds, eval_time, filtering_time = pool_result.get()
         results.append((preds, eval_time, filtering_time))
-        # close shared memory object
-        shm.close()
-        shm.unlink()
     return results

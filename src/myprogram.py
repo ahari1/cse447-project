@@ -3,7 +3,7 @@ import os
 import string
 import random
 from argparse import ArgumentParser, ArgumentDefaultsHelpFormatter
-from utils import load_bloom, next_char as nc, init_pool
+from utils import next_char as nc, init_pool
 import time
 # import matplotlib.pyplot as plt
 
@@ -12,10 +12,11 @@ class MyModel:
     This is a starter model to get you started. Feel free to modify this file.
     """
 
-    def __init__(self, model=None, token_vocab=None, token_trie=None):
-        self.model = model
-        self.token_vocab = token_vocab
+    def __init__(self, pool=None):
+        # self.model = model
+        # self.token_vocab = token_vocab
         # self.token_trie = token_trie
+        self.pool = pool
         self.common_chars = [" ", "e", 'a', 'r', 'i', 'n', 's']
         
 
@@ -47,7 +48,6 @@ class MyModel:
 
     def run_pred(self, data):
         # initialize multiprocessing pool
-        pool = init_pool(self.token_vocab)
         batch_size = 32
 
         # parallelize this at some point
@@ -59,7 +59,7 @@ class MyModel:
         for i in range(0, len(data), batch_size):
             start = time.time()
             batch = data[i:min(i + batch_size, len(data))]
-            batch_results = nc(self.model, pool, batch)
+            batch_results = nc(self.pool, batch)
             try:
                 curr_eval_times = []
                 curr_filtering_times = []
@@ -90,9 +90,6 @@ class MyModel:
             batch_time = time.time() - start
             print(f"Batch took {batch_time * 1000} milliseconds, average {batch_time * 1000 / len(batch)} ms per line")
 
-        # close the pool
-        pool.close()
-        pool.join()
         # Plot the time taken for each prediction with respect to the number of characters in the input
 
         # return preds, eval_times, filtering_times
@@ -109,8 +106,9 @@ class MyModel:
         # your code here
         # this particular model has nothing to load, but for demonstration purposes we will load a blank file
         
-        model, token_vocab = load_bloom(work_dir)
-        instance = cls(model, token_vocab)
+        # model, token_vocab = load_bloom(work_dir)
+        pool = init_pool(work_dir)
+        instance = cls(pool)
         # instance.model = model
         # instance.token_vocab = token_vocab
         # with open(os.path.join(work_dir, 'model.checkpoint')) as f:
