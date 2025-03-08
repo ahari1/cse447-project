@@ -83,36 +83,42 @@ def process_input(input_text, lookback):
             continue
         curr_logits = logits[idx - start_pos]
         # valid_tokens = [i for token, (i,) in trie.items(remaining_text) if len(token) > len(remaining_text)]
-        valid_tokens = trie.get_valid_tokens(remaining_text)
+        valid_tokens = np.array(trie.get_valid_tokens(remaining_text))
         if len(valid_tokens) <= 0:
             location_prob *= 1e-2
             continue
         else:
-            mask = np.zeros(curr_logits.shape, dtype=bool)
+            # mask = np.zeros(curr_logits.shape, dtype=bool)
             # mask2 = np.zeros(curr_logits.shape, dtype=bool)
             # mask2[valid_tokens2] = True
-            mask[valid_tokens] = True
-            processed_logits = np.where(mask, curr_logits, -np.inf)
+            # mask[valid_tokens] = True
+            # processed_logits = np.where(mask, curr_logits, -np.inf)
+            processed_logits = curr_logits[valid_tokens]
             if idx < num_tokens - 1:
-                processed_logits[tokens[idx]] = curr_logits[tokens[idx]]
-                curr_prob = softmax(processed_logits, axis=-1)
-                next_token_prob = max(curr_prob[tokens[idx+1]].item(), 1e-2)
+                # processed_logits[tokens[idx]] = curr_logits[tokens[idx]]
+                next_token_logit = curr_logits[tokens[idx+1]]
+                max_val = max(np.max(processed_logits, keepdims=True), next_token_logit)
+                exp_x = np.exp(processed_logits - max_val)
+                exp_next = np.exp(next_token_logit - max_val)
+                sum_exp_x = np.sum(exp_x, keepdims=True) + exp_next
+                curr_prob = exp_x / sum_exp_x
+                next_token_prob = max((exp_next / sum_exp_x).item(), 1e-2)
             else:
                 curr_prob = softmax(processed_logits, axis=-1)
                 next_token_prob = 1
-            indices = np.argpartition(curr_prob, -100)[-100:]
+            indices = np.argpartition(curr_prob, max(-100, -len(valid_tokens)))[-100:]
             top_probs = curr_prob[indices]
+            orig_indices = valid_tokens[indices]
             token_vals = [vocab[i] for i in indices]
-            for prob, index, token_val in zip(top_probs, indices, token_vals):
-                if mask[index]:
-                    if prob < 1e-4:
-                        continue
-                    try:
-                        token_char = token_val.decode("utf-8")[len(remaining_text)]
-                        # print(idx, prob.item(), f'"{token_val}"', f"'{token_char}'")
-                        results[token_char] += prob.item() * location_prob
-                    except:
-                        pass
+            for prob, index, token_val in zip(top_probs, orig_indices, token_vals):
+                if prob < 1e-4:
+                    continue
+                try:
+                    token_char = token_val.decode("utf-8")[len(remaining_text)]
+                    # print(idx, prob.item(), f'"{token_val}"', f"'{token_char}'")
+                    results[token_char] += prob.item() * location_prob
+                except:
+                    pass
 
             location_prob *= next_token_prob
     filtering_time = time.time() - t1
