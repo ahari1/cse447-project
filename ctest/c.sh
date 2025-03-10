@@ -1,4 +1,4 @@
-g++ -Wall -shared -std=c++17 -fPIC -Ofast \
+g++ -Wall -shared -std=c++17 -fPIC -Ofast -mavx2 \
     $(python3-config --includes) \
     $(python3 -m pybind11 --includes) \
     test.cc \
