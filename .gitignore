@@ -3,3 +3,6 @@ work/
 output/
 submit/
 submit.zip
+/ctest/marisa-trie
+/ctest/xcdat/
+/ctest/.vscode/
