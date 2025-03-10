@@ -1,5 +1,6 @@
 #include <pybind11/pybind11.h>
 #include <pybind11/stl.h>
+#include <pybind11/numpy.h>
 #include <string>
 #include <vector>
 #include <map>
@@ -33,14 +34,19 @@ public:
         }
     }
     
-    vector<int> get_valid_tokens(const string& remaining_text) {
-        vector<int> result;
-        trie.predictive_search(remaining_text, [&remaining_text, &result, this](const uint64_t i, const string_view token) {
+    py::array_t<int> get_valid_tokens(const string& remaining_text) {
+        vector<int>* result = new vector<int>();
+        trie.predictive_search(remaining_text, [&remaining_text, result, this](const uint64_t i, const string_view token) {
             if (token.size() > remaining_text.size()) {
-                result.push_back(this->trie_id_to_token_id[i]);
+                result->push_back(this->trie_id_to_token_id[i]);
             }
         });
-        return result;
+        return py::array_t<int>(
+                {result->size()},
+                {sizeof(int)},
+                result->data(),
+                py::capsule(result, [](void *p) {delete static_cast<vector<int>*>(p);})
+        );
     }
     
 private:
