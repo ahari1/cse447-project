@@ -57,5 +57,12 @@ public:
         value = pos->second.first;
         return true;
     }
+
+    ~LRUCache() {
+        // deallocate the SharedVectors
+        for (auto& item : keyValuesMap) {
+            decref(item.second.first);
+        }
+    }
 };
 
