@@ -25,7 +25,7 @@ class LRUCache
 private:
     std::list<std::string>items;
     std::unordered_map <std::string, std::pair<SharedVector *const, typename std::list<std::string>::iterator>> keyValuesMap;
-    int csize;
+    size_t csize;
 
 public:
     LRUCache(int s) :csize(s) {
@@ -35,23 +35,15 @@ public:
 
     void set(const std::string& key, SharedVector *const value) {
         value->ref++;
-        auto pos = keyValuesMap.find(key);
-        if (pos == keyValuesMap.end()) {
-            items.push_front(key);
-            keyValuesMap.emplace(key, std::make_pair(value, items.begin()));
-            if (keyValuesMap.size() > csize) {
-                // we also decrement the reference count
-                auto pos2 = keyValuesMap.find(items.back());
-                assert(pos2 != keyValuesMap.end()); 
-                decref(pos2->second.first);
-                keyValuesMap.erase(pos2);
-                items.pop_back();
-            }
-        }
-        else {
-            items.erase(pos->second.second);
-            items.push_front(key);
-            keyValuesMap.emplace(key, std::make_pair(value, items.begin()));
+        items.push_front(key);
+        keyValuesMap.emplace(key, std::make_pair(value, items.begin()));
+        if (keyValuesMap.size() > csize) {
+            // we also decrement the reference count
+            auto pos2 = keyValuesMap.find(items.back());
+            assert(pos2 != keyValuesMap.end()); 
+            decref(pos2->second.first);
+            keyValuesMap.erase(pos2);
+            items.pop_back();
         }
     }
 
@@ -61,7 +53,7 @@ public:
             return false;
         items.erase(pos->second.second);
         items.push_front(key);
-        keyValuesMap.emplace(key, std::make_pair( pos->second.first, items.begin() ));
+        pos->second.second = items.begin();
         value = pos->second.first;
         return true;
     }
