@@ -6,6 +6,7 @@
 #include <map>
 
 #include <xcdat.hpp>
+#include "utils.hpp"
 
 using namespace std;
 
@@ -13,7 +14,7 @@ namespace py = pybind11;
 
 class FastTrie {
 public:
-    FastTrie(const vector<string>& keys) {
+    FastTrie(const vector<string>& keys) : query_cache(32) {
         int n = keys.size();
         map<string, int> key_to_token_id;
         for (int i = 0; i < n; ++i) {
@@ -35,23 +36,38 @@ public:
     }
     
     py::array_t<int> get_valid_tokens(const string& remaining_text) {
-        vector<int>* result = new vector<int>();
-        trie.predictive_search(remaining_text, [&remaining_text, result, this](const uint64_t i, const string_view token) {
-            if (token.size() > remaining_text.size()) {
-                result->push_back(this->trie_id_to_token_id[i]);
+        SharedVector* result;
+        if (query_cache.get(remaining_text, result)) {
+            // increment reference count
+            result->ref++;
+        } else {
+            result = new SharedVector();
+            trie.predictive_search(remaining_text, [&remaining_text, result, this](const uint64_t i, const string_view token) {
+                if (token.size() > remaining_text.size()) {
+                    result->vec.push_back(this->trie_id_to_token_id[i]);
+                }
+            });
+            // if this was a difficult query, add to cache
+            if (result->vec.size() > 100) {
+                // note: query cache increments the ref count internally
+                query_cache.set(remaining_text, result);
             }
-        });
+        }
         return py::array_t<int>(
-                {result->size()},
+                {result->vec.size()},
                 {sizeof(int)},
-                result->data(),
-                py::capsule(result, [](void *p) {delete static_cast<vector<int>*>(p);})
+                result->vec.data(),
+                py::capsule(result, [](void *p) {
+                    SharedVector* data = static_cast<SharedVector*>(p);
+                    decref(data);
+                })
         );
     }
     
 private:
     xcdat::trie_8_type trie;
     vector<int> trie_id_to_token_id;
+    LRUCache query_cache;
 };
 
 // The macro below defines a Python module named "marisa_ext".
