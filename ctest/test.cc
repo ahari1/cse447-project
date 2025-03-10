@@ -19,7 +19,7 @@ constexpr int CACHE_THRESHOLD = 100;
 
 class FastTrie {
 public:
-    FastTrie(const vector<string>& keys) : query_cache(CAChE_SIZE) {
+    FastTrie(const vector<string>& keys) : query_cache(CACHE_SIZE) {
         int n = keys.size();
         map<string, int> key_to_token_id;
         for (int i = 0; i < n; ++i) {
