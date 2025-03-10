@@ -59,8 +59,8 @@ class MyModel:
         for i in range(0, len(data), batch_size):
             start = time.time()
             batch = data[i:min(i + batch_size, len(data))]
-            batch_results = nc(self.pool, batch)
             try:
+                batch_results = nc(self.pool, batch)
                 curr_eval_times = []
                 curr_filtering_times = []
                 batch_preds = []
@@ -79,12 +79,13 @@ class MyModel:
                         curr_preds = curr_preds[:3]
 
                     batch_preds.append(curr_preds)
+
+                eval_times.extend(curr_eval_times)
+                filtering_times.extend(curr_filtering_times)
             except:
                 batch_preds = [[" ", "e", "a"]] * len(batch)
 
             preds.extend(''.join(pred) for pred in batch_preds)
-            eval_times.extend(curr_eval_times)
-            filtering_times.extend(curr_filtering_times)
             input_lengths.extend(len(b) for b in batch)
 
             batch_time = time.time() - start

@@ -12,9 +12,14 @@ using namespace std;
 
 namespace py = pybind11;
 
+constexpr size_t CACHE_SIZE = 32;
+
+// minimum size to be eligible to be in LRU cache
+constexpr int CACHE_THRESHOLD = 100;
+
 class FastTrie {
 public:
-    FastTrie(const vector<string>& keys) : query_cache(32) {
+    FastTrie(const vector<string>& keys) : query_cache(CAChE_SIZE) {
         int n = keys.size();
         map<string, int> key_to_token_id;
         for (int i = 0; i < n; ++i) {
@@ -48,7 +53,7 @@ public:
                 }
             });
             // if this was a difficult query, add to cache
-            if (result->vec.size() > 100) {
+            if (result->vec.size() > CACHE_THRESHOLD) {
                 // note: query cache increments the ref count internally
                 query_cache.set(remaining_text, result);
             }
