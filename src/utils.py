@@ -50,7 +50,7 @@ def init_worker(work_dir):
 
 def init_pool(work_dir="../work"):
     """Loads the multiprocessing pool"""
-    pool = Pool(initializer=init_worker, initargs=(work_dir,), processes=4)
+    pool = Pool(initializer=init_worker, initargs=(work_dir,), processes=2)
     return pool
 
 def softmax(x, axis=None):
