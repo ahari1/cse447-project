@@ -61,10 +61,10 @@ def softmax(x, axis=None):
 
 def process_input(input_text, lookback):
     tokens = model.tokenize(input_text.encode("utf-8"))
-    if input_text.endswith(". "):
-        tokens = tokens[:-1] + [17, 210]
-    elif input_text.endswith(", "):
-        tokens = tokens[:-1] + [15, 210]
+    # if input_text.endswith(". "):
+    #     tokens = tokens[:-1] + [17, 210]
+    # elif input_text.endswith(", "):
+    #     tokens = tokens[:-1] + [15, 210]
     t0 = time.time()
     model(tokens, max_tokens=1)
     eval_time = time.time() - t0
