@@ -64,7 +64,7 @@ def process_input(input_text, lookback):
     model(tokens, max_tokens=1)
     results = defaultdict(float)
     num_tokens = len(tokens)
-    location_prob = 1
+    location_prob = 1e+4
     logits = model._scores[-lookback:]
     start_pos = max(0, num_tokens - lookback)
     for idx in range(start_pos, num_tokens):
