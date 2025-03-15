@@ -125,7 +125,7 @@ if __name__ == '__main__':
             print('Making working directory {}'.format(args.work_dir))
             os.makedirs(args.work_dir)
         print('Instatiating model')
-        model = MyModel(None, None)
+        model = MyModel(None)
         print('Loading training data')
         train_data = MyModel.load_training_data()
         print('Training')
