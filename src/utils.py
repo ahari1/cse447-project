@@ -19,11 +19,11 @@ def get_llama():
     from llama_cpp import Llama
     return Llama, has_cuda
 
-def load_bloom(work_dir):
+def load_model(work_dir):
     # Load model and tokenizer
     # https://huggingface.co/docs/transformers/en/gguf
     Llama, use_gpu = get_llama()
-    filename = "bloom-560m.q8_0.gguf"
+    filename = "Llama-3.2-1B.Q5_K_M.gguf"
     model = Llama(model_path=os.path.join(work_dir, filename), logits_all=True, n_gpu_layers=-1 if use_gpu else 0, verbose=False)
 
     # load token vocabulary
@@ -36,7 +36,7 @@ def load_bloom(work_dir):
             decoded_token = token_bytes.decode("utf-8")
         except UnicodeDecodeError:
             # Handle the error, e.g., by replacing the invalid token with a placeholder
-            decoded_token = f"."
+            decoded_token = ""
         decoded_tokens.append(decoded_token)
         token_vocab.append(token_bytes)
 
@@ -46,7 +46,7 @@ def load_bloom(work_dir):
 def init_worker(work_dir):
     """Function used to initialize shared data for workers"""
     global trie, vocab, model
-    model, trie, vocab = load_bloom(work_dir)
+    model, trie, vocab = load_model(work_dir)
 
 def init_pool(work_dir="../work"):
     """Loads the multiprocessing pool"""
@@ -61,22 +61,15 @@ def softmax(x, axis=None):
 
 def process_input(input_text, lookback):
     tokens = model.tokenize(input_text.encode("utf-8"))
-    if input_text.endswith(". "):
-        tokens = tokens[:-1] + [17, 210]
-    elif input_text.endswith(", "):
-        tokens = tokens[:-1] + [15, 210]
-    t0 = time.time()
     model(tokens, max_tokens=1)
-    eval_time = time.time() - t0
     results = defaultdict(float)
     num_tokens = len(tokens)
     location_prob = 1
     logits = model._scores[-lookback:]
-    t1 = time.time()
     start_pos = max(0, num_tokens - lookback)
     for idx in range(start_pos, num_tokens):
         try:
-            remaining_text = b''.join([vocab[tokens[i]] for i in range(idx+1, len(tokens))]).decode("utf-8")
+            remaining_text = b''.join([vocab[tokens[i]] for i in range(idx+1, len(tokens))])
         except:
             # just skip
             print("ERROR")
@@ -124,11 +117,8 @@ def process_input(input_text, lookback):
                     pass
 
             location_prob *= next_token_prob
-    filtering_time = time.time() - t1
-    print(f"Filtering took {(filtering_time) * 1000} milliseconds.")
-
     # compute pseudo probability
-    return sorted(results.items(), key=lambda x: x[1], reverse=True), eval_time, filtering_time
+    return sorted(results.items(), key=lambda x: x[1], reverse=True)
 
 def next_char(pool, input_texts, lookback=4):
     pool_results = []
@@ -138,6 +128,6 @@ def next_char(pool, input_texts, lookback=4):
     results = []
     # gather results from pool
     for pool_result in pool_results:
-        preds, eval_time, filtering_time = pool_result.get()
-        results.append((preds, eval_time, filtering_time))
+        preds = pool_result.get()
+        results.append(preds)
     return results

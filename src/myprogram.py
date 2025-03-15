@@ -52,8 +52,6 @@ class MyModel:
 
         # parallelize this at some point
         preds: list[str] = []
-        eval_times = []
-        filtering_times = []
         input_lengths = []
 
         for i in range(0, len(data), batch_size):
@@ -61,13 +59,9 @@ class MyModel:
             batch = data[i:min(i + batch_size, len(data))]
             try:
                 batch_results = nc(self.pool, batch)
-                curr_eval_times = []
-                curr_filtering_times = []
                 batch_preds = []
-                for j, (curr_preds, eval_time, filtering_time) in enumerate(batch_results):
+                for j, curr_preds in enumerate(batch_results):
                     curr_preds = [p[0] for p in curr_preds if p[0] not in "\u000A\u000B\u000C\u000D\u0085\u2028\u2029"]
-                    curr_eval_times.append(eval_time)
-                    curr_filtering_times.append(filtering_time)
 
                     if len(curr_preds) < 3:
                         for i in range(len(self.common_chars)):
@@ -80,9 +74,8 @@ class MyModel:
 
                     batch_preds.append(curr_preds)
 
-                eval_times.extend(curr_eval_times)
-                filtering_times.extend(curr_filtering_times)
-            except:
+            except Exception as e:
+                print(e)
                 batch_preds = [[" ", "e", "a"]] * len(batch)
 
             preds.extend(''.join(pred) for pred in batch_preds)
